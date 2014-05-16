@@ -1,0 +1,14 @@
+
+
+
+
+Sequence_Number_and_Table_Number_Lookup.txt:
+	wget http://ftp2.census.gov/acs2012_3yr/summaryfile/Sequence_Number_and_Table_Number_Lookup.txt
+
+codebook.txt: PUMS_Data_Dictionary_2010-2012.pdf
+	pdf2txt.py PUMS_Data_Dictionary_2010-2012.pdf > codebook.txt
+
+
+codebook.tsv: codebook.txt
+#There are some weird whitespace characters in here...
+	perl -ne 'if (m/^([A-Z0-9]{1,}) +[0-9]/){$$field=$$1};if (m/^\s{4,5}([A-Z].*)/){$$realname=$$1};if (m/^ {10,}([0-9]+) \.(.*)/) {$$code=$$1;$$name=$$2; print "$$field\t$$realname\t$$code\t$$name\n"}' $< > $@

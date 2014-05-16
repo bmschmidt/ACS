@@ -1,0 +1,9 @@
+csv_pus/
+*.zip
+.DS_Store
+.Rproj.user
+codebook.tsv
+codebook.txt
+.Rhistory
+.RData
+Makefile~ makeDatabase.SQL~
