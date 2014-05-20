@@ -7,3 +7,5 @@ codebook.txt
 .Rhistory
 .RData
 Makefile~ makeDatabase.SQL~
+weights.txt
+Rplot.png Rplot01.png
