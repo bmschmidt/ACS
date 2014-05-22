@@ -9,3 +9,6 @@ codebook.txt
 Makefile~ makeDatabase.SQL~
 weights.txt
 Rplot.png Rplot01.png
+ss12pusa.csv ss12pusb.csv ss12pusc.csv ss12pusd.csv
+ACS2010-2012_PUMS_README.pdf
+ss12pus*

@@ -2,24 +2,8 @@ library(dplyr)
 library(ggplot2)
 
 returnWeights = function(weights=1:80) {
-  if (!file.exists("weights.RData")) {
-    persons = tbl(src=tables,"persons")
-    query = 
-      paste("SELECT SERIALNO,",paste0("PWGTP",1:80,collapse=","), "FROM persons LIMIT 30")
-    elements = list(.data=persons,list(c("SERIALNO",paste0("PWGTP",weights))))
-    data = do.call(s_select,elements) %.% collect()
-    library(reshape2)
-    n = melt(data,id.vars="SERIALNO")
-    names(n) = c("SERIALNO","sample","weight")
-    #I don't care if the sample numbers are the same, so just coerce
-    n$sample = as.numeric(n$sample)
-    save(n,file='weights.RData')
-    return(n)
-  } else {
-    rm(n)
-    load("weights.RData")
-    return(n)
-  }
+  weights = read.table("weights.txt",sep="\t",header=F,colClasses=c("numeric","integer","integer"))
+  names(weights) = c("SERIALNO","sample","weight")
 }
 
 writeOutFields = function() {

@@ -11,10 +11,10 @@ source("functions.R")
 #nrow=10000
 library(dplyr)
 library(ggplot2)
+library(matrixStats) # for weighted.mean
 tables = src_mysql("ACS",user='bschmidt','password'='Try my raisin Brahms')
 persons = tbl(src=tables,"persons")
-broadFields = read.table("MajorFields.tsv",sep="\t",header=T) %.% group_by(FOD1P,Discipline) %.% summarize(count=sum(count))
-
+broadFields = read.table("MajorFields.tsv",sep="\t",header=T) %>% group_by(FOD1P,Discipline) %>% summarize(count=sum(count))
 ```
 
 
@@ -22,28 +22,28 @@ First query: collect Age, weighting, and major. We can use this to validate the 
 
 ``` {r}
 
-raw = persons %.% select(AGEP,FOD1P,PWGTP,PWGTP1) %.% collect() %.% encode("FOD1P")
+raw = persons %>% select(AGEP,FOD1P,PWGTP,PWGTP1) %>% collect() %>% encode("FOD1P")
 
 
 rounding=2
 
-broadFields = read.table("MajorFields.tsv",sep="\t",header=T) %.% group_by(FOD1P,Discipline) %.% summarize(count=sum(count))
+broadFields = read.table("MajorFields.tsv",sep="\t",header=T) %>% group_by(FOD1P,Discipline) %>% summarize(count=sum(count))
 
-table = raw %.%
-  mutate(decade=rounding*floor((2012-AGEP)/rounding)) %.% 
-  inner_join(broadFields,by="FOD1P") %.% mutate(field=Discipline)
-
-
-p = table %.% filterToTopN("Discipline",35) %.% filter(!is.na(Discipline))
-ageTotals = p %.% group_by(decade) %.% summarise(collegePop = sum(PWGTP))
+table = raw %>%
+  mutate(decade=rounding*floor((2012-AGEP)/rounding)) %>% 
+  inner_join(broadFields,by="FOD1P") %>% mutate(field=Discipline)
 
 
-newtotals = p %.% inner_join(ageTotals) %.% group_by(Discipline,decade) %.% summarise(count=sum(PWGTP/collegePop))
+p = table %>% filterToTopN("Discipline",35) %>% filter(!is.na(Discipline))
+ageTotals = p %>% group_by(decade) %>% summarise(collegePop = sum(PWGTP))
+
+
+newtotals = p %>% inner_join(ageTotals) %>% group_by(Discipline,decade) %>% summarise(count=sum(PWGTP/collegePop))
 
 library(scales)
-ggplot(newtotals%.% filter(decade<1990)) + geom_area() + aes(x=decade+20,y=count,fill=Discipline) + facet_wrap(~Discipline,scales="free") + scale_y_continuous(labels=percent) 
+ggplot(newtotals%>% filter(decade<1990)) + geom_area() + aes(x=decade+20,y=count,fill=Discipline) + facet_wrap(~Discipline,scales="free") + scale_y_continuous(labels=percent) 
 
-totals = totals %.% inner_join(broadFields,by="")
+totals = totals %>% inner_join(broadFields,by="")
 
 ```
 
@@ -51,7 +51,7 @@ Something stupid: how do commutes matter?
 
 ``` {r}
 
-commutes = persons %.% select(JWMNP,FOD1P,AGEP) %.% collect() %.% encode("FOD1P") %.% filterToTopN("FOD1P",25)
+commutes = persons %>% select(JWMNP,FOD1P,AGEP) %>% collect() %>% encode("FOD1P") %>% filterToTopN("FOD1P",25)
 ggplot(commutes) + geom_boxplot(aes(y=JWMNP,x=FOD1P)) + coord_flip() + scale_y_log10()
 
 
@@ -62,15 +62,15 @@ Do overall employment rates differ?
 ``` {r}
 #### Employed at all:
 
-raw = persons %.% filter(SCHL>=21,AGEP < 60,AGEP>22) %.% select(PINCP,AGEP,ESR,FOD1P,SEX,PWGTP)  %.% collect()
+raw = persons %>% filter(SCHL>=21,AGEP < 60,AGEP>22) %>% select(PINCP,AGEP,ESR,FOD1P,SEX,PWGTP)  %>% collect()
 
-employed = raw %.% encode("FOD1P") %.% encode("SEX") %.% encode("ESR")
-employed = employed %.% filterToTopN("FOD1P",35)
+employed = raw %>% encode("FOD1P") %>% encode("SEX") %>% encode("ESR")
+employed = employed %>% filterToTopN("FOD1P",35)
 
-employStatus = employed %.% filter(AGEP>30,AGEP<39) %.% 
-  group_by(FOD1P,SEX) %.% 
-  mutate(totals = sum(PWGTP)) %.% 
-  group_by("ESR") %.%
+employStatus = employed %>% filter(AGEP>30,AGEP<39) %>% 
+  group_by(FOD1P,SEX) %>% 
+  mutate(totals = sum(PWGTP)) %>% 
+  group_by("ESR") %>%
   summarize(percent=sum(PWGTP/totals))
   
   
@@ -83,24 +83,24 @@ Actual income.
 
 ``` {r}
 
-raw = persons %.% filter(SCHL>=21,AGEP < 60,AGEP>22,WKHP>30) %.% 
-  #select(PINCP,AGEP,ESR,FOD1P,SEX,PWGTP,PWGTP1,PWGTP10)  %.% 
+raw = persons %>% filter(SCHL>=21,AGEP < 60,AGEP>22,WKHP>30) %>% 
+  #select(PINCP,AGEP,ESR,FOD1P,SEX,PWGTP,PWGTP1,PWGTP10)  %>% 
   collect()
 
 
-incomes = raw %.% encode("FOD1P") %.% encode("SEX") %.% encode("ESR") %.% mutate(PINCP=as.numeric(PINCP),weight=PWGTP,decade=rounding*floor((2012-AGEP)/rounding),ageGroup = ifelse(AGEP<26,"25 or under",ifelse(AGEP<=33,"26-35",ifelse(AGEP<=45,"36-45",ifelse(AGEP<=60,"46-60","Over 60")))))
-#incomes = incomes %.% filterToTopN("FOD1P",35)
+incomes = raw %>% encode("FOD1P") %>% encode("SEX") %>% encode("ESR") %>% mutate(PINCP=as.numeric(PINCP),weight=PWGTP,decade=rounding*floor((2012-AGEP)/rounding),ageGroup = ifelse(AGEP<26,"25 or under",ifelse(AGEP<=33,"26-35",ifelse(AGEP<=45,"36-45",ifelse(AGEP<=60,"46-60","Over 60")))))
+#incomes = incomes %>% filterToTopN("FOD1P",35)
 
-incomes = incomes %.% inner_join(broadFields)
+incomes = incomes %>% inner_join(broadFields)
 
 
 
-#Disciplincomes = incomes %.% filter(AGEP>35,AGEP<=60)%.% group_by(Discipline) %.% summarize(locWeight=sum(weight),income = median(PINCP),meanIncome=weighted.mean(PINCP,weights=weight)) %.% filter(!is.na(Discipline))
+#Disciplincomes = incomes %>% filter(AGEP>35,AGEP<=60)%>% group_by(Discipline) %>% summarize(locWeight=sum(weight),income = median(PINCP),meanIncome=weighted.mean(PINCP,weights=weight)) %>% filter(!is.na(Discipline))
 
 summarizingFunction = function(data) {
-  value = data %.% 
-    group_by(Discipline) %.% 
-    summarize(income = median(PINCP),meanIncome=weighted.mean(PINCP,w=weightval)) %.% 
+  value = data %>% 
+    group_by(Discipline) %>% 
+    summarize(income = median(PINCP),meanIncome=weighted.mean(PINCP,w=weightval)) %>% 
     filter(!is.na(Discipline))
 }
 
@@ -116,7 +116,7 @@ errorize = function(data,summarizingFunction) {
     silent = returnval
   }
   f = lapply(1:10,sampleRun)
-  returnable = f %.% rbind_all()
+  returnable = f %>% rbind_all()
 }
 
 ggplot(returnable) + geom_point(aes(x=meanIncome,y=Discipline),alpha=.33)
@@ -134,14 +134,14 @@ Income gaps by broad field
 ---------------------------
 
 ``` {r}
-incomeTotals = incomes %.% 
-    mutate(field=FOD1P) %.% #Uncomment this line to get the results at the individual field level
-group_by(field,SEX,ageGroup) %.% summarize(income = median(PINCP),menCounted = sum(SEX=="Male"),womenCounted = sum(SEX=="Female"))
+incomeTotals = incomes %>% 
+    mutate(field=FOD1P) %>% #Uncomment this line to get the results at the individual field level
+group_by(field,SEX,ageGroup) %>% summarize(income = median(PINCP),menCounted = sum(SEX=="Male"),womenCounted = sum(SEX=="Female"))
 
-gaps = incomeTotals %.% ungroup() %.% 
-  group_by(field,ageGroup,add=F) %.% summarize(gap = (median(income[SEX=="Female"])-median(income[SEX=="Male"]))/median(income[SEX=="Male"]),menCounted=sum(menCounted),womenCounted=sum(womenCounted),income = mean(income)) %.% arrange(-gap)
+gaps = incomeTotals %>% ungroup() %>% 
+  group_by(field,ageGroup,add=F) %>% summarize(gap = (median(income[SEX=="Female"])-median(income[SEX=="Male"]))/median(income[SEX=="Male"]),menCounted=sum(menCounted),womenCounted=sum(womenCounted),income = mean(income)) %>% arrange(-gap)
 
-gapgap = gaps %.% group_by(field) %.% summarize(gapgap = gap[ageGroup=="46-60"]-gap[ageGroup=="25 or under"],menCounted=sum(menCounted),womenCounted=sum(womenCounted)) %.% arrange(-gapgap)
+gapgap = gaps %>% group_by(field) %>% summarize(gapgap = gap[ageGroup=="46-60"]-gap[ageGroup=="25 or under"],menCounted=sum(menCounted),womenCounted=sum(womenCounted)) %>% arrange(-gapgap)
 
 library(scales)
 #ggplot(gaps) + geom_bar(aes(x=ageGroup,y=gap,fill=ageGroup),stat="identity",position="dodge")  + scale_y_continuous("Gap between male and female salaries",labels=percent) + facet_wrap(~Discipline,scales="free_x") + labs(title="Gap between median male and female salaries, by college major and age")
@@ -150,45 +150,45 @@ library(scales)
 Per Jan Freeman: do the gaps correspond to the pay?
 
 ``` {r}
-ggplot(gaps %.% filter(ageGroup=="26-35",menCounted>100,womenCounted>100),aes(x=income,y=gap,label=field,size=menCounted+womenCounted)) + geom_point(alpha=.3) + scale_size_continuous(trans='sqrt',range=c(3,9)) + scale_x_continuous(label=dollar) + geom_smooth(method='lm') + geom_text(data=gaps %.% filter(ageGroup=="26-35",menCounted>1000,womenCounted>1000),size=3) + scale_y_continuous(label=percent) + labs(title="connection between gender gap and income by major: not very strong")
+ggplot(gaps %>% filter(ageGroup=="26-35",menCounted>100,womenCounted>100),aes(x=income,y=gap,label=field,size=menCounted+womenCounted)) + geom_point(alpha=.3) + scale_size_continuous(trans='sqrt',range=c(3,9)) + scale_x_continuous(label=dollar) + geom_smooth(method='lm') + geom_text(data=gaps %>% filter(ageGroup=="26-35",menCounted>1000,womenCounted>1000),size=3) + scale_y_continuous(label=percent) + labs(title="connection between gender gap and income by major: not very strong")
 ```
 
 Just for 26-35 year olds
 -------------------------
 ``` {r}
 
-younglings = gaps %.% filter(ageGroup=="26-35",!is.na(Discipline)) %.% ungroup() %.% mutate(Discipline = reorder(Discipline,gap))
+younglings = gaps %>% filter(ageGroup=="26-35",!is.na(Discipline)) %>% ungroup() %>% mutate(Discipline = reorder(Discipline,gap))
 
 ggplot(younglings) + geom_bar(aes(x=Discipline,y=-gap,fill=Discipline),stat="identity",position="dodge")  + scale_y_continuous(labels=percent) + labs(title="Gap between median male and female salaries,\nemployed 26-35 year olds, by college major",y="% by which female pay is less than male\nSource: American Community Survey",x="") + coord_flip() + theme(axis.text=element_text(size=14),legend.position="None")
 
 
-ggplot(incomeTotals %.% filter(ageGroup=="26-35")) + geom_bar(aes(x=FOD1P,y=income,fill=SEX),stat="identity",position="dodge") + coord_flip()
+ggplot(incomeTotals %>% filter(ageGroup=="26-35")) + geom_bar(aes(x=FOD1P,y=income,fill=SEX),stat="identity",position="dodge") + coord_flip()
 
 ```
 
 The heart of the matter: incomes.
 
 ``` {r}
-raw = persons %.% filter(SCHL>=21,AGEP < 60,AGEP>20,WKHP>30)  %.% select(PINCP,AGEP,PWGTP,PWGTP1,FOD1P,SEX,SCHL)  %.% collect()
-incomes = raw %.% encode("FOD1P") %.% encode("SEX") %.% encode("SCHL")
-ggplot(incomes %.% group_by(AGEP,SCHL) %.% 
+raw = persons %>% filter(SCHL>=21,AGEP < 60,AGEP>20,WKHP>30)  %>% select(PINCP,AGEP,PWGTP,PWGTP1,FOD1P,SEX,SCHL)  %>% collect()
+incomes = raw %>% encode("FOD1P") %>% encode("SEX") %>% encode("SCHL")
+ggplot(incomes %>% group_by(AGEP,SCHL) %>% 
          summarise(income=mean(PINCP))) + geom_line(aes(x=AGEP,y=income,color=SCHL))
 
 rounding=5
 
-primeYears = incomes %.% filterToTopN("FOD1P",25) %.%
-  mutate(decade=rounding*floor((2012-AGEP)/rounding),ageGroup = ifelse(AGEP<26,"25 or under",ifelse(AGEP<=33,"26-35",ifelse(AGEP<=45,"36-45",ifelse(AGEP<=60,"46-60","Over 60"))))) %.% 
+primeYears = incomes %>% filterToTopN("FOD1P",25) %>%
+  mutate(decade=rounding*floor((2012-AGEP)/rounding),ageGroup = ifelse(AGEP<26,"25 or under",ifelse(AGEP<=33,"26-35",ifelse(AGEP<=45,"36-45",ifelse(AGEP<=60,"46-60","Over 60"))))) %>% 
   filter(decade >= 1955,decade<=1985)
 
-yearly = primeYears  %.%
-  group_by(FOD1P,decade) %.% 
-  summarise(income=weighted.mean(as.numeric(PINCP),weights=PWGTP)) %.%
+yearly = primeYears  %>%
+  group_by(FOD1P,decade) %>% 
+  summarise(income=weighted.mean(as.numeric(PINCP),weights=PWGTP)) %>%
   arrange(-income)
 
-byBins = primeYears %.%
-  group_by(FOD1P,ageGroup,SEX) %.%
-  summarise(income=weighted.mean(as.numeric(PINCP),weights=PWGTP),median=median(PINCP)) %.%
-  group_by(FOD1P,add=F) %.% mutate(overall=median(median)) %.%
+byBins = primeYears %>%
+  group_by(FOD1P,ageGroup,SEX) %>%
+  summarise(income=weighted.mean(as.numeric(PINCP),weights=PWGTP),median=median(PINCP)) %>%
+  group_by(FOD1P,add=F) %>% mutate(overall=median(median)) %>%
   arrange(-overall)
 
 ggplot(byBins) + facet_wrap(~FOD1P) + geom_bar(aes(x=ageGroup,y=median,fill=SEX),position="dodge",stat="identity") + scale_y_continuous(trans="sqrt")
@@ -200,12 +200,12 @@ persons
 ```
 
 ``` {r}
-PHDS = persons %.% filter(SCHL==24,AGEP < 60,AGEP>20,WKHP>30) %.% select(PINCP,AGEP,PWGTP,PWGTP1,FOD2P,SEX) %.% collect()
-docs = PHDS %.% encode("FOD2P") %.% encode("SEX") %.% filterToTopN("FOD2P",25) %.%
+PHDS = persons %>% filter(SCHL==24,AGEP < 60,AGEP>20,WKHP>30) %>% select(PINCP,AGEP,PWGTP,PWGTP1,FOD2P,SEX) %>% collect()
+docs = PHDS %>% encode("FOD2P") %>% encode("SEX") %>% filterToTopN("FOD2P",25) %>%
   mutate(decade=rounding*floor((2012-AGEP)/rounding),ageGroup = ifelse(AGEP<26,"25 or under",ifelse(AGEP<=33,"26-35",ifelse(AGEP<=45,"36-45",ifelse(AGEP<=60,"46-60","Over 60")))))
 
-docs %.% group_by(SEX,FOD2P) %.% 
-  summarise(income=weighted.mean(as.numeric(PINCP),weights=PWGTP),num=n(),median = median(PINCP)) %.% 
+docs %>% group_by(SEX,FOD2P) %>% 
+  summarise(income=weighted.mean(as.numeric(PINCP),weights=PWGTP),num=n(),median = median(PINCP)) %>% 
   arrange(-median)
 
 ggplot(byBins) + facet_wrap(~FOD2P) + geom_line(aes(x=2012-decade,y=income))
@@ -216,33 +216,33 @@ ggplot(byBins) + facet_wrap(~FOD2P) + geom_line(aes(x=2012-decade,y=income))
 What industries do historians end up in?
 
 ``` {r}
-Industries = persons %.% filter(SCHL>=21,AGEP < 60,AGEP>20,WKHP>30) %.% select(SERIALNO,PINCP,AGEP,PWGTP,FOD1P,SEX,INDP) %.% collect()
+Industries = persons %>% filter(SCHL>=21,AGEP < 60,AGEP>20,WKHP>30) %>% select(SERIALNO,PINCP,AGEP,PWGTP,FOD1P,SEX,INDP) %>% collect()
 
 
-industries = Industries %.% encode("INDP") %.% encode("FOD1P") %.% mutate(weight=PWGTP)
-broadFields = read.table("MajorFields.tsv",sep="\t",header=T) %.% group_by(FOD1P,Discipline) %.% summarize(count=sum(count))
-industries = industries %.% inner_join(broadFields)
+industries = Industries %>% encode("INDP") %>% encode("FOD1P") %>% mutate(weight=PWGTP)
+broadFields = read.table("MajorFields.tsv",sep="\t",header=T) %>% group_by(FOD1P,Discipline) %>% summarize(count=sum(count))
+industries = industries %>% inner_join(broadFields)
 
 
-expectations = industries %.% ungroup() %.% 
-  mutate(total=sum(weight),field=FOD1P) %.% 
-  group_by(field) %.% 
-  mutate(majorCount=sum(weight),majorShare=majorCount/total) %.% 
-  group_by(INDP,add=F) %.% 
-  mutate(industryCount=sum(weight),industryShare=industryCount/total) %.%
-  ungroup() %.% 
-  group_by(field,INDP) %.% summarize(count = sum(PWGTP),expected=total[1]*industryShare[1]*majorShare[1],diff=count/expected)
+expectations = industries %>% ungroup() %>% 
+  mutate(total=sum(weight),field=FOD1P) %>% 
+  group_by(field) %>% 
+  mutate(majorCount=sum(weight),majorShare=majorCount/total) %>% 
+  group_by(INDP,add=F) %>% 
+  mutate(industryCount=sum(weight),industryShare=industryCount/total) %>%
+  ungroup() %>% 
+  group_by(field,INDP) %>% summarize(count = sum(PWGTP),expected=total[1]*industryShare[1]*majorShare[1],diff=count/expected)
 
 
-expectations %.% arrange(-count) %.% filter(field=="ENGLISH LANGUAGE AND LITERATURE")
+expectations %>% arrange(-count) %>% filter(field=="ENGLISH LANGUAGE AND LITERATURE")
 
-tops = expectations %.% filterToTopN("field",countVariable=quote(count)) %.% filterToTopN("INDP",countVariable=quote(count),n=45)
+tops = expectations %>% filterToTopN("field",countVariable=quote(count)) %>% filterToTopN("INDP",countVariable=quote(count),n=45)
 write.table(tops,file="/tmp/tmp.tsv",sep="\t",quote=F,row.names=F)
 ggplot(tops) + geom_tile(aes(x=field,y=INDP,fill=diff)) + scale_fill_gradient2(trans='log') + theme(axis.text.x=element_text(angle=45,hjust=1))
 
 
 fieldname="Humanities"
-ggplot(expectations %.% filter(field==fieldname) %.% arrange(-count) %.% head(50)) + geom_bar(aes(y=count,x=reorder(INDP,count),fill=diff),stat="identity") + theme(axis.text.y=element_text(size=16)) +   scale_fill_gradient2("Observed/expected\nratio (blue\nmeans more than expected\n,red less)",trans='log',breaks=as.vector(outer(c(1,2,3,5),c(.01,.1,1,10)))) + coord_flip() + facet_wrap(~field) + geom_point(aes(y=expected,x=reorder(INDP,count)),shape=17) + labs(title=paste("Employment industry of ",tolower(field),"majors\n(Expected numbers based on population shown by triangles,\n and color showing ratio, so blue fields show a strong affinity to",tolower(field),"and red shows an aversion)"),y="Est. number of Americans in the major working in the industry\n(Source: American Community Survey)","Industry of employment") 
+ggplot(expectations %>% filter(field==fieldname) %>% arrange(-count) %>% head(50)) + geom_bar(aes(y=count,x=reorder(INDP,count),fill=diff),stat="identity") + theme(axis.text.y=element_text(size=16)) +   scale_fill_gradient2("Observed/expected\nratio (blue\nmeans more than expected\n,red less)",trans='log',breaks=as.vector(outer(c(1,2,3,5),c(.01,.1,1,10)))) + coord_flip() + facet_wrap(~field) + geom_point(aes(y=expected,x=reorder(INDP,count)),shape=17) + labs(title=paste("Employment industry of ",tolower(field),"majors\n(Expected numbers based on population shown by triangles,\n and color showing ratio, so blue fields show a strong affinity to",tolower(field),"and red shows an aversion)"),y="Est. number of Americans in the major working in the industry\n(Source: American Community Survey)","Industry of employment") 
 
 
 ```
@@ -251,34 +251,39 @@ ggplot(expectations %.% filter(field==fieldname) %.% arrange(-count) %.% head(50
 What jobs do historians end up in?
 
 ``` {r}
-Industries = persons %.% filter(SCHL>=21,AGEP < 60,AGEP>20,WKHP>30) %.% select(PINCP,AGEP,PWGTP,FOD1P,SEX,OCCP10,OCCP12) %.% collect()
+Industries = persons %>% filter(SCHL>=21,AGEP < 60,AGEP>20,WKHP>30) %>% select(SERIALNO,PINCP,AGEP,PWGTP,FOD1P,SEX,OCCP10,OCCP12) %>% collect()
 
-industries = Industries %.% encode("OCCP10") %.% encode("OCCP12") %.% encode("FOD1P") %.% mutate(weight=PWGTP,occupation=factor(ifelse(is.na(OCCP10),as.character(OCCP12),as.character(OCCP10))))
-broadFields = read.table("MajorFields.tsv",sep="\t",header=T) %.% 
-  group_by(FOD1P,Discipline) %.% summarize(count=sum(count))
-industries = industries %.% inner_join(broadFields)
+industries = Industries %>% encode("OCCP10") %>% encode("OCCP12") %>% encode("FOD1P") %>% mutate(occupation=factor(ifelse(is.na(OCCP10),as.character(OCCP12),as.character(OCCP10))))
 
 
-expectations = industries %.% ungroup() %.% 
-  mutate(total=sum(weight),field=FOD1P) %.% 
-  group_by(field) %.% 
-  mutate(majorCount=sum(weight),majorShare=majorCount/total) %.% 
-  group_by(occupation,add=F) %.% 
-  mutate(industryCount=sum(weight),industryShare=industryCount/total) %.%
-  ungroup() %.% 
-  group_by(field,occupation) %.% summarize(count = sum(PWGTP),expected=total[1]*industryShare[1]*majorShare[1],diff=count/expected)
+broadFields = read.table("MajorFields.tsv",sep="\t",header=T) %>% 
+  group_by(FOD1P,Discipline) %>% summarize(count=sum(count))
+industries = industries %>% inner_join(broadFields)
+
+withWeights = industries %>% inner_join(weights)
+
+expectations = industries %>% mutate(weight=PWGTP) %>% 
+  mutate(total=sum(weight),field=FOD1P) %>% 
+  group_by(field) %>% 
+  mutate(majorCount=sum(weight),majorShare=majorCount/total) %>% 
+  group_by(occupation) %>% 
+  mutate(industryCount=sum(weight),industryShare=industryCount/total) %>%
+  group_by(field,occupation) %>% 
+  summarize(count = sum(weight),expected=total[1]*industryShare[1]*majorShare[1],diff=count/expected)
 
 
-expectations %.% arrange(-count) %.% filter(field=="ENGLISH LANGUAGE AND LITERATURE")
 
-tops = expectations %.% filterToTopN("field",countVariable=quote(count)) %.% filterToTopN("occupation",countVariable=quote(count),n=45)
+expectations %>% arrange(-count) %>% filter(field=="ENGLISH LANGUAGE AND LITERATURE")
+
+tops = expectations %>% filterToTopN("field",countVariable=quote(count),n=50) %>% filterToTopN("occupation",countVariable=quote(count),n=55)
 write.table(tops,file="/tmp/tmp.tsv",sep="\t",quote=F,row.names=F)
 ggplot(tops) + geom_tile(aes(x=field,y=occupation,fill=diff)) + scale_fill_gradient2(trans='log') + theme(axis.text.x=element_text(angle=45,hjust=1))
-
+tops
+sum(tops$count)/sum(expectations$count)
 
 fieldname="HISTORY"
 fieldname="ENGLISH LANGUAGE AND LITERATURE"
-ggplot(expectations %.% filter(field==fieldname) %.% arrange(-count) %.% head(50)) + 
+ggplot(expectations %>% filter(field==fieldname) %>% arrange(-count) %>% head(50)) + 
   geom_bar(aes(y=count,x=reorder(occupation,count),fill=diff),stat="identity") + 
   theme(axis.text.y=element_text(size=16)) +   
   scale_fill_gradient2("Observed/expected\nratio (blue\nmeans more than expected\n,red less)",trans='log',breaks=as.vector(outer(c(1,2,3,5),c(.01,.1,1,10)))) + 
@@ -287,5 +292,200 @@ ggplot(expectations %.% filter(field==fieldname) %.% arrange(-count) %.% head(50
   geom_point(aes(y=expected,x=reorder(occupation,count)),shape=17) + 
   labs(title=paste("Jobs of ",tolower(fieldname),"majors\n(Expected numbers based on population shown by triangles,\n and color showing ratio, so blue fields show a strong affinity to",tolower(fieldname),"and red shows an aversion)"),y="Est. number of Americans in the major working at job\n(Source: American Community Survey)","Industry of employment") 
 
+ggplot(tops %>% arrange(-count)) + 
+  geom_bar(aes(y=count,x=reorder(occupation,count),fill=diff),stat="identity") + 
+  theme(axis.text.y=element_text(size=16)) +   
+  scale_fill_gradient2("Observed/expected\nratio (blue\nmeans more than expected\n,red less)",trans='log',breaks=as.vector(outer(c(1,2,3,5),c(.01,.1,1,10)))) + 
+  coord_flip() + 
+  facet_wrap(~field,nrow=2) + 
+  geom_point(aes(y=expected,x=reorder(occupation,count)),shape=17) + 
+  labs(title=paste("Jobs of ",tolower(fieldname),"majors\n(Expected numbers based on population shown by triangles,\n and color showing ratio, so blue fields show a strong affinity to",tolower(fieldname),"and red shows an aversion)"),y="Est. number of Americans in the major working at job\n(Source: American Community Survey)","Industry of employment") + scale_y_log10()
 
+```
+How does ancestry play into this?
+
+``` {r}
+
+ancestries = persons %>% filter(SCHL>=21,AGEP < 60,AGEP>20,WKHP>30) %>% select(SERIALNO,PINCP,AGEP,PWGTP,FOD1P,SEX,ANC1P05,ANC1P12) %>% collect()
+
+industries = ancestries %>% encode("ANC1P12") %>% encode("ANC1P05") %>% encode("FOD1P") %>% mutate(occupation=factor(ifelse(is.na(ANC1P12),as.character(ANC1P05),as.character(ANC1P12))))
+
+
+
+
+
+broadFields = read.table("MajorFields.tsv",sep="\t",header=T) %>% 
+  group_by(FOD1P,Discipline) %>% summarize(count=sum(count))
+industries = industries %>% inner_join(broadFields)
+
+withWeights = industries %>% inner_join(weights)
+
+expectations = industries %>% mutate(weight=PWGTP) %>% 
+  mutate(total=sum(weight),field=FOD1P) %>% 
+  group_by(field) %>% 
+  mutate(majorCount=sum(weight),majorShare=majorCount/total) %>% 
+  group_by(occupation) %>% 
+  mutate(industryCount=sum(weight),industryShare=industryCount/total) %>%
+  group_by(field,occupation) %>% 
+  summarize(count = sum(weight),expected=total[1]*industryShare[1]*majorShare[1],diff=count/expected)
+
+summarizeWithWeights = function(frame,...) {
+  #Should already be somewhat put together.
+  dots = list(...)
+  dots = lapply(dots,function(defaultFunction) {
+    function(weight=quote(PWTGP)) {
+      frame
+    }
+  })
+  frame = frame %>% 
+    group_by(sample) %>% #Make sure it's grouped by sample
+    summarise(count=dots[['count']]())  
+#  dots[[".data"]] = frame
+  #do.call(summarize,dots)
+ # dots
+}
+
+
+head(withWeights) %>% summarizeWithWeights(count=quote(sum(weight)))
+
+expectations %>% arrange(-count) %>% filter(field=="ENGLISH LANGUAGE AND LITERATURE")
+
+tops = expectations %>% filterToTopN("field",countVariable=quote(count),n=50) %>% filterToTopN("occupation",countVariable=quote(count),n=55)
+write.table(tops,file="/tmp/tmp.tsv",sep="\t",quote=F,row.names=F)
+ggplot(tops) + geom_tile(aes(x=field,y=occupation,fill=diff)) + scale_fill_gradient2(trans='log') + theme(axis.text.x=element_text(angle=45,hjust=1))
+
+
+fieldname="HISTORY"
+fieldname="ENGLISH LANGUAGE AND LITERATURE"
+ggplot(expectations %>% filter(field==fieldname) %>% arrange(-count) %>% head(50)) + 
+  geom_bar(aes(y=count,x=reorder(occupation,count),fill=diff),stat="identity") + 
+  theme(axis.text.y=element_text(size=16)) +   
+  scale_fill_gradient2("Observed/expected\nratio (blue\nmeans more than expected\n,red less)",trans='log',breaks=as.vector(outer(c(1,2,3,5),c(.01,.1,1,10)))) + 
+  coord_flip() + 
+  facet_wrap(~field) + 
+  geom_point(aes(y=expected,x=reorder(occupation,count)),shape=17) + 
+  labs(title=paste("Jobs of ",tolower(fieldname),"majors\n(Expected numbers based on population shown by triangles,\n and color showing ratio, so blue fields show a strong affinity to",tolower(fieldname),"and red shows an aversion)"),y="Est. number of Americans in the major working at job\n(Source: American Community Survey)","Industry of employment") 
+
+ggplot(tops %>% arrange(-count)) + 
+  geom_bar(aes(y=count,x=reorder(occupation,count),fill=diff),stat="identity") + 
+  theme(axis.text.y=element_text(size=16)) +   
+  scale_fill_gradient2("Observed/expected\nratio (blue\nmeans more than expected\n,red less)",trans='log',breaks=as.vector(outer(c(1,2,3,5),c(.01,.1,1,10)))) + 
+  coord_flip() + 
+  facet_wrap(~field,nrow=2) + 
+  geom_point(aes(y=expected,x=reorder(occupation,count)),shape=17) + 
+  labs(title=paste("Jobs of ",tolower(fieldname),"majors\n(Expected numbers based on population shown by triangles,\n and color showing ratio, so blue fields show a strong affinity to",tolower(fieldname),"and red shows an aversion)"),y="Est. number of Americans in the major working at job\n(Source: American Community Survey)","Industry of employment") + scale_y_log10()
+
+```
+
+This amazing map…
+
+``` {r}
+
+ancestries = persons %>% filter(SCHL>=21,AGEP < 60,AGEP>20,WKHP>30) %>% select(SERIALNO,PINCP,AGEP,PWGTP,FOD1P,SEX,ST) %>% collect()
+
+industries = ancestries %>% encode("ST") %>% encode("FOD1P") %>% mutate(occupation=ST)
+
+broadFields = read.table("MajorFields.tsv",sep="\t",header=T) %>% 
+  group_by(FOD1P,Discipline) %>% summarize(count=sum(count))
+industries = industries %>% inner_join(broadFields)
+
+#withWeights = industries %>% inner_join(weights)
+
+expectations = industries %>% mutate(weight=PWGTP) %>% 
+  mutate(total=sum(weight),field=FOD1P) %>% 
+  group_by(field) %>% 
+  mutate(majorCount=sum(weight),majorShare=majorCount/total) %>% 
+  group_by(occupation) %>% 
+  mutate(industryCount=sum(weight),industryShare=industryCount/total) %>%
+  group_by(field,occupation) %>% 
+  summarize(count = sum(weight),expected=total[1]*industryShare[1]*majorShare[1],diff=count/expected)
+
+
+expectations %>% arrange(-count) %>% filter(field=="ENGLISH LANGUAGE AND LITERATURE")
+
+tops = expectations %>% filterToTopN("field",countVariable=quote(count),n=50) %>% filterToTopN("occupation",countVariable=quote(count),n=55)
+write.table(tops,file="/tmp/tmp.tsv",sep="\t",quote=F,row.names=F)
+ggplot(tops) + geom_tile(aes(x=field,y=occupation,fill=diff)) + scale_fill_gradient2(trans='log') + theme(axis.text.x=element_text(angle=45,hjust=1))
+
+tops %>% arrange(-diff) %>% group_by(occupation) %>% summarize(topfield=field[1])
+
+fieldname="HISTORY"
+fieldname="ENGLISH LANGUAGE AND LITERATURE"
+ggplot(expectations %>% filter(field==fieldname) %>% arrange(-count) %>% head(50)) + 
+  geom_bar(aes(y=count,x=reorder(occupation,count),fill=diff),stat="identity") + 
+  theme(axis.text.y=element_text(size=16)) +   
+  scale_fill_gradient2("Observed/expected\nratio (blue\nmeans more than expected\n,red less)",trans='log',breaks=as.vector(outer(c(1,2,3,5),c(.01,.1,1,10)))) + 
+  coord_flip() + 
+  facet_wrap(~field) + 
+  geom_point(aes(y=expected,x=reorder(occupation,count)),shape=17) + 
+  labs(title=paste("Jobs of ",tolower(fieldname),"majors\n(Expected numbers based on population shown by triangles,\n and color showing ratio, so blue fields show a strong affinity to",tolower(fieldname),"and red shows an aversion)"),y="Est. number of Americans in the major working at job\n(Source: American Community Survey)","Industry of employment") 
+
+ggplot(tops %>% arrange(-count)) + 
+  geom_bar(aes(y=count,x=reorder(occupation,count),fill=diff),stat="identity") + 
+  theme(axis.text.y=element_text(size=16)) +   
+  scale_fill_gradient2("Observed/expected\nratio (blue\nmeans more than expected\n,red less)",trans='log',breaks=as.vector(outer(c(1,2,3,5),c(.01,.1,1,10)))) + 
+  coord_flip() + 
+  facet_wrap(~field,nrow=2) + 
+  geom_point(aes(y=expected,x=reorder(occupation,count)),shape=17) + 
+  labs(title=paste("Jobs of ",tolower(fieldname),"majors\n(Expected numbers based on population shown by triangles,\n and color showing ratio, so blue fields show a strong affinity to",tolower(fieldname),"and red shows an aversion)"),y="Est. number of Americans in the major working at job\n(Source: American Community Survey)","Industry of employment") + scale_y_log10()
+
+```
+
+Will it get you married?
+
+
+``` {r}
+
+ancestries = persons %>% filter(SCHL>=21,AGEP < 60,AGEP>20,WKHP>30) %>% select(SERIALNO,AGEP,PWGTP,FOD1P,SEX,MAR) %>% collect()
+
+industries = ancestries %>% encode("MAR") %>% encode("FOD1P") %>% mutate(occupation=MAR)
+
+broadFields = read.table("MajorFields.tsv",sep="\t",header=T) %>% 
+  group_by(FOD1P,Discipline) %>% summarize(count=sum(count))
+
+industries = industries %>% inner_join(broadFields)
+
+#withWeights = industries %>% inner_join(weights)
+
+head(industries)
+summary(lm(occupation=="Divorced"~factor(AGEP)+Discipline,industries,weights=PWGTP))
+
+expectations = industries %>% mutate(weight=PWGTP) %>% 
+  mutate(total=sum(weight),field=Discipline) %>% 
+  group_by(field) %>% 
+  mutate(majorCount=sum(weight),majorShare=majorCount/total) %>% 
+  group_by(occupation) %>% 
+  mutate(industryCount=sum(weight),industryShare=industryCount/total) %>%
+  group_by(field,occupation) %>% 
+  summarize(count = sum(weight),expected=total[1]*industryShare[1]*majorShare[1],diff=count/expected)
+
+
+
+tops = expectations %>% filterToTopN("field",countVariable=quote(count),n=50) %>% filterToTopN("occupation",countVariable=quote(count),n=55)
+ggplot(tops) + geom_tile(aes(x=field,y=occupation,fill=diff)) + scale_fill_gradient2(trans='log') + theme(axis.text.x=element_text(angle=45,hjust=1))
+
+
+
+
+tops %>% arrange(-diff) %>% group_by(occupation) %>% summarize(topfield=field[1])
+
+fieldname="HISTORY"
+fieldname="ENGLISH LANGUAGE AND LITERATURE"
+ggplot(expectations %>% filter(field==fieldname) %>% arrange(-count) %>% head(50)) + 
+  geom_bar(aes(y=count,x=reorder(occupation,count),fill=diff),stat="identity") + 
+  theme(axis.text.y=element_text(size=16)) +   
+  scale_fill_gradient2("Observed/expected\nratio (blue\nmeans more than expected\n,red less)",trans='log',breaks=as.vector(outer(c(1,2,3,5),c(.01,.1,1,10)))) + 
+  coord_flip() + 
+  facet_wrap(~field) + 
+  geom_point(aes(y=expected,x=reorder(occupation,count)),shape=17) + 
+  labs(title=paste("Jobs of ",tolower(fieldname),"majors\n(Expected numbers based on population shown by triangles,\n and color showing ratio, so blue fields show a strong affinity to",tolower(fieldname),"and red shows an aversion)"),y="Est. number of Americans in the major working at job\n(Source: American Community Survey)","Industry of employment") 
+
+ggplot(tops %>% arrange(-count)) + 
+  geom_bar(aes(y=count,x=reorder(occupation,count),fill=diff),stat="identity") + 
+  theme(axis.text.y=element_text(size=16)) +   
+  scale_fill_gradient2("Observed/expected\nratio (blue\nmeans more than expected\n,red less)",trans='log',breaks=as.vector(outer(c(1,2,3,5),c(.01,.1,1,10)))) + 
+  coord_flip() + 
+  facet_wrap(~field,nrow=2) + 
+  geom_point(aes(y=expected,x=reorder(occupation,count)),shape=17) + 
+  labs(title=paste("Jobs of ",tolower(fieldname),"majors\n(Expected numbers based on population shown by triangles,\n and color showing ratio, so blue fields show a strong affinity to",tolower(fieldname),"and red shows an aversion)"),y="Est. number of Americans in the major working at job\n(Source: American Community Survey)","Industry of employment") + scale_y_log10()
 ```

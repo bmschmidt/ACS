@@ -1,13 +1,13 @@
 
 
-database: csv_pus/ss12pusa.csv
+database: ss12pusa.csv
 	mysql < makeDatabase.SQL
 	touch database
 
 csv_pus.zip:
 	wget http://www2.census.gov/acs2012_3yr/pums/csv_pus.zip
 
-csv_pus/ss12pusa.csv: csv_pus.zip
+ss12pusa.csv: csv_pus.zip
 	unzip csv_pus.zip
 
 Sequence_Number_and_Table_Number_Lookup.txt:
